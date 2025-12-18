@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - ShopEasy</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #f5f5f5;
+        }
+        
+        .navbar {
+            background: #667eea;
+            color: white;
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        .navbar h1 {
+            font-size: 24px;
+        }
+        
+        .navbar-right {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+        
+        .refresh-btn, .logout-btn {
+            background: white;
+            color: #667eea;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+        
+        .refresh-btn:hover, .logout-btn:hover {
+            background: #f0f0f0;
+        }
+        
+        .hint-btn {
+            background: #f39c12;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+        
+        .hint-btn:hover {
+            background: #e67e22;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+        
+        .wallet-card {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 30px;
+        }
+        
+        .wallet-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .wallet-balance {
+            font-size: 48px;
+            font-weight: bold;
+            color: #27ae60;
+            transition: all 0.3s ease;
+        }
+        
+        .currency {
+            font-size: 24px;
+            color: #7f8c8d;
+        }
+        
+        .bonus-info {
+            background: #e8f5e9;
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 20px;
+        }
+        
+        .bonus-info.not-claimed {
+            background: #fff3cd;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .stat-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            color: #7f8c8d;
+            font-size: 14px;
+        }
+        
+        .reset-btn {
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: background 0.3s;
+        }
+        
+        .reset-btn:hover {
+            background: #c0392b;
+        }
+        
+        
+        .loading {
+            opacity: 0.6;
+        }
+        
+        .last-update {
+            color: #7f8c8d;
+            font-size: 12px;
+            margin-top: 10px;
+            text-align: right;
+        }
+        
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <h1>🛍️ ShopEasy Dashboard</h1>
+        <div class="navbar-right">
+            <button class="hint-btn" onclick="showHint()">💡 Vulnerability Hint</button>
+            <button class="refresh-btn" onclick="loadWalletInfo(true)">🔄 Refresh</button>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </div>
+    </div>
+    
+    <div class="container">
+        <div class="wallet-card">
+            <div class="wallet-header">
+                <div>
+                    <h2>My Wallet</h2>
+                    <p style="color: #7f8c8d;">Your current balance</p>
+                </div>
+                <div>
+                    <button class="reset-btn" onclick="resetAccount()">Reset Account</button>
+                </div>
+            </div>
+            
+            <div>
+                <span class="currency">₹</span>
+                <span class="wallet-balance" id="walletBalance">Loading...</span>
+            </div>
+            
+            <div id="bonusInfo" class="bonus-info">
+                <strong>Loading wallet information...</strong>
+            </div>
+            
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="bonusClaimCount">-</div>
+                    <div class="stat-label">Bonus Claims</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="bonusStatus">-</div>
+                    <div class="stat-label">Bonus Status</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="totalEarned">₹0</div>
+                    <div class="stat-label">Total Earned</div>
+                </div>
+            </div>
+            
+            <div class="last-update">
+                Last updated: <span id="lastUpdate">Never</span>
+            </div>
+        </div>
+        
+    </div>
+    
+    <script>
+        let previousBalance = null;
+        
+        function showHint() {
+            alert('🔍 Hint: Find and exploit the race condition vulnerability to claim the welcome bonus multiple times!');
+        }
+        
+        function updateTimestamp() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString();
+            document.getElementById('lastUpdate').textContent = timeString;
+        }
+        
+        async function loadWalletInfo(showAnimation = false) {
+            const walletBalance = document.getElementById('walletBalance');
+            
+            if (showAnimation) {
+                walletBalance.classList.add('loading');
+            }
+            
+            try {
+                console.log('Fetching wallet info...');
+                const response = await fetch('/api/wallet');
+                console.log('Response status:', response.status);
+                
+                const data = await response.json();
+                console.log('Wallet data:', data);
+                
+                if (data.success) {
+                    const balance = parseFloat(data.walletBalance) || 0;
+                    const bonusCount = parseInt(data.bonusClaimCount) || 0;
+                    
+                    console.log('Balance:', balance);
+                    console.log('Bonus Count:', bonusCount);
+                    console.log('Bonus Claimed:', data.bonusClaimed);
+                    
+                    // Check if vulnerability was exploited (for console logging only)
+                    if (balance > 100 || bonusCount > 1) {
+                        console.log('%c🚨 VULNERABILITY EXPLOITED! 🚨', 'color: red; font-size: 20px; font-weight: bold;');
+                        console.log(`%cExpected: ₹100 | Actual: ₹${balance.toFixed(2)}`, 'color: red; font-size: 14px;');
+                        console.log(`%cBonus claims: ${bonusCount} (should be 1)`, 'color: red; font-size: 14px;');
+                        
+                    } 
+                    
+                    // Update balance with animation if changed
+                    if (previousBalance !== null && balance !== previousBalance) {
+                        console.log('Balance changed from', previousBalance, 'to', balance);
+                        walletBalance.style.transform = 'scale(1.2)';
+                        setTimeout(() => {
+                            walletBalance.style.transform = 'scale(1)';
+                        }, 300);
+                    }
+                    previousBalance = balance;
+                    
+                    // Always show balance in GREEN (looks normal)
+                    walletBalance.textContent = balance.toFixed(2);
+                    walletBalance.style.color = '#27ae60';
+                    
+                    // Update bonus claim count (always normal styling)
+                    document.getElementById('bonusClaimCount').textContent = bonusCount;
+                    
+                    // Update bonus status
+                    document.getElementById('bonusStatus').textContent = 
+                        data.bonusClaimed ? '✓' : '❌';
+                    
+                    // Update total earned
+                    document.getElementById('totalEarned').textContent = `₹${balance.toFixed(2)}`;
+                    
+                    // Update bonus info message - ALWAYS SHOW NORMAL MESSAGE
+                    const bonusInfo = document.getElementById('bonusInfo');
+                    
+                    if (balance === 0 && !data.bonusClaimed) {
+                        bonusInfo.className = 'bonus-info not-claimed';
+                        bonusInfo.innerHTML = `
+                            <strong>⚠️ Welcome Bonus Not Claimed</strong>
+                            <p>Logout and login again to claim your ₹100 welcome bonus!</p>
+                        `;
+                    } else if (bonusCount === 0) {
+                        bonusInfo.className = 'bonus-info not-claimed';
+                        bonusInfo.innerHTML = `
+                            <strong>⚠️ No Bonus Received Yet</strong>
+                            <p>Logout and login again to receive your welcome bonus!</p>
+                        `;
+                    } else {
+                        // ALWAYS show normal success message, even if exploited
+                        bonusInfo.className = 'bonus-info';
+                        bonusInfo.innerHTML = `
+                            <strong>✓ Welcome Bonus Claimed!</strong>
+                            <p>You received ₹100 as welcome bonus</p>
+                        `;
+                    }
+                    
+                    // Update timestamp
+                    updateTimestamp();
+                    
+                } else {
+                    console.error('Wallet API returned success: false');
+                    window.location.href = '/';
+                }
+            } catch (error) {
+                console.error('Error loading wallet:', error);
+                document.getElementById('walletBalance').textContent = 'Error';
+            } finally {
+                if (showAnimation) {
+                    walletBalance.classList.remove('loading');
+                }
+            }
+        }
+        
+        async function logout() {
+            try {
+                await fetch('/api/logout', { method: 'POST' });
+                window.location.href = '/';
+            } catch (error) {
+                console.error('Logout error:', error);
+                window.location.href = '/';
+            }
+        }
+        
+        async function resetAccount() {
+            if (!confirm('Reset your account for testing?\n\nThis will:\n- Set balance to ₹0\n- Clear bonus claim status\n- Delete all bonus transactions\n\nYou will be logged out.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/reset-user', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ email: 'test@example.com' })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✓ Account reset successfully!\n\nYou can now login again to test the vulnerability.');
+                    await logout();
+                } else {
+                    alert('Failed to reset account. Please try again.');
+                }
+            } catch (error) {
+                console.error('Reset error:', error);
+                alert('Error resetting account. Check console for details.');
+            }
+        }
+        
+        // Load wallet info immediately on page load
+        console.log('Dashboard loaded. Fetching wallet info...');
+        loadWalletInfo();
+        
+        // Auto-refresh every 2 seconds to catch real-time changes
+        setInterval(() => loadWalletInfo(false), 2000);
+        
+        // Add keyboard shortcut for refresh (F5 or Ctrl+R)
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'F5' || (e.ctrlKey && e.key === 'r')) {
+                e.preventDefault();
+                loadWalletInfo(true);
+            }
+        });
+    </script>
+</body>
+</html>
