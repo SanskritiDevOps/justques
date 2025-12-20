@@ -7,37 +7,29 @@ require('dotenv').config();
 
 const app = express();
 
-/* =======================
-   MIDDLEWARE
-======================= */
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
-// CORS (Frontend on Vercel)
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'https://justques.vercel.app', // Load from Env Var
+    origin: true,
     credentials: true
 }));
 
-/* =======================
-   SESSION CONFIG (RENDER SAFE)
-======================= */
+
 app.use(session({
     name: 'justques-session',
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
     cookie: {
-        maxAge: 3600000,     // 1 hour
-        secure: true,        // HTTPS (Render)
-        sameSite: 'none'     // Cross-origin (Vercel frontend)
+        maxAge: 3600000,
+        secure: true,
+        sameSite: 'lax',
+        httpOnly: true
     }
 }));
 
-/* =======================
-   DATABASE (CLOUD MYSQL)
-======================= */
 const pool = mysql.createPool({
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
@@ -47,15 +39,11 @@ const pool = mysql.createPool({
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
-    // CRITICAL FOR TIDB CLOUD:
     ssl: {
         minVersion: 'TLSv1.2',
         rejectUnauthorized: true
     }
 });
-/* =======================
-   LOGIN (RACE CONDITION)
-======================= */
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
 
@@ -84,7 +72,6 @@ app.post('/api/login', async (req, res) => {
         req.session.userId = user.id;
         req.session.username = user.username;
 
-        // ⚠️ INTENTIONALLY VULNERABLE RACE CONDITION
         if (!user.welcome_bonus_claimed) {
 
             await new Promise(resolve => setTimeout(resolve, 100));
@@ -135,9 +122,6 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-/* =======================
-   WALLET
-======================= */
 app.get('/api/wallet', async (req, res) => {
     if (!req.session.userId) {
         return res.status(401).json({
@@ -180,18 +164,12 @@ app.get('/api/wallet', async (req, res) => {
     }
 });
 
-/* =======================
-   LOGOUT
-======================= */
 app.post('/api/logout', (req, res) => {
     req.session.destroy(() => {
         res.json({ success: true, message: 'Logged out successfully' });
     });
 });
 
-/* =======================
-   RESET USER (CHALLENGE)
-======================= */
 app.post('/api/reset-user', async (req, res) => {
     const { email } = req.body;
 
@@ -220,9 +198,6 @@ app.post('/api/reset-user', async (req, res) => {
     }
 });
 
-/* =======================
-   STATIC PAGES
-======================= */
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
@@ -233,10 +208,6 @@ app.get('/dashboard', (req, res) => {
     }
     res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
-
-/* =======================
-   SERVER START (RENDER)
-======================= */
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
