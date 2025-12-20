@@ -16,7 +16,7 @@ app.use(express.static('public'));
 
 // CORS (Frontend on Vercel)
 app.use(cors({
-    origin: 'https://justques.vercel.app',
+    origin: process.env.FRONTEND_URL || 'https://justques.vercel.app', // Load from Env Var
     credentials: true
 }));
 
@@ -41,14 +41,18 @@ app.use(session({
 const pool = mysql.createPool({
     host: process.env.DB_HOST,
     user: process.env.DB_USER,
-    port: process.env.DB_PORT,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
+    port: process.env.DB_PORT || 4000, // TiDB uses port 4000
     waitForConnections: true,
     connectionLimit: 10,
-    queueLimit: 0
+    queueLimit: 0,
+    // CRITICAL FOR TIDB CLOUD:
+    ssl: {
+        minVersion: 'TLSv1.2',
+        rejectUnauthorized: true
+    }
 });
-
 /* =======================
    LOGIN (RACE CONDITION)
 ======================= */
