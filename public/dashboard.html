@@ -151,7 +151,6 @@
             background: #c0392b;
         }
         
-        
         .loading {
             opacity: 0.6;
         }
@@ -162,7 +161,6 @@
             margin-top: 10px;
             text-align: right;
         }
-        
     </style>
 </head>
 <body>
@@ -215,14 +213,13 @@
                 Last updated: <span id="lastUpdate">Never</span>
             </div>
         </div>
-        
     </div>
     
     <script>
         let previousBalance = null;
         
         function showHint() {
-            alert('🔍 Hint: Find and exploit the race condition vulnerability to claim the welcome bonus multiple times!');
+            alert('🔍 Hint: Find and exploit the race condition vulnerability to claim the welcome bonus multiple times!\n\nTip: Run the exploit script in the browser console on the login page.');
         }
         
         function updateTimestamp() {
@@ -239,32 +236,23 @@
             }
             
             try {
-                console.log('Fetching wallet info...');
-                const response = await fetch('/api/wallet');
-                console.log('Response status:', response.status);
+                const response = await fetch('/api/wallet', {
+                    credentials: 'include'
+                });
                 
                 const data = await response.json();
-                console.log('Wallet data:', data);
                 
                 if (data.success) {
                     const balance = parseFloat(data.walletBalance) || 0;
                     const bonusCount = parseInt(data.bonusClaimCount) || 0;
                     
-                    console.log('Balance:', balance);
-                    console.log('Bonus Count:', bonusCount);
-                    console.log('Bonus Claimed:', data.bonusClaimed);
-                    
-                    // Check if vulnerability was exploited (for console logging only)
                     if (balance > 100 || bonusCount > 1) {
                         console.log('%c🚨 VULNERABILITY EXPLOITED! 🚨', 'color: red; font-size: 20px; font-weight: bold;');
                         console.log(`%cExpected: ₹100 | Actual: ₹${balance.toFixed(2)}`, 'color: red; font-size: 14px;');
                         console.log(`%cBonus claims: ${bonusCount} (should be 1)`, 'color: red; font-size: 14px;');
-                        
-                    } 
+                    }
                     
-                    // Update balance with animation if changed
                     if (previousBalance !== null && balance !== previousBalance) {
-                        console.log('Balance changed from', previousBalance, 'to', balance);
                         walletBalance.style.transform = 'scale(1.2)';
                         setTimeout(() => {
                             walletBalance.style.transform = 'scale(1)';
@@ -272,21 +260,13 @@
                     }
                     previousBalance = balance;
                     
-                    // Always show balance in GREEN (looks normal)
                     walletBalance.textContent = balance.toFixed(2);
                     walletBalance.style.color = '#27ae60';
                     
-                    // Update bonus claim count (always normal styling)
                     document.getElementById('bonusClaimCount').textContent = bonusCount;
-                    
-                    // Update bonus status
-                    document.getElementById('bonusStatus').textContent = 
-                        data.bonusClaimed ? '✓' : '❌';
-                    
-                    // Update total earned
+                    document.getElementById('bonusStatus').textContent = data.bonusClaimed ? '✔' : '✖';
                     document.getElementById('totalEarned').textContent = `₹${balance.toFixed(2)}`;
                     
-                    // Update bonus info message - ALWAYS SHOW NORMAL MESSAGE
                     const bonusInfo = document.getElementById('bonusInfo');
                     
                     if (balance === 0 && !data.bonusClaimed) {
@@ -302,19 +282,16 @@
                             <p>Logout and login again to receive your welcome bonus!</p>
                         `;
                     } else {
-                        // ALWAYS show normal success message, even if exploited
                         bonusInfo.className = 'bonus-info';
                         bonusInfo.innerHTML = `
-                            <strong>✓ Welcome Bonus Claimed!</strong>
+                            <strong>✔ Welcome Bonus Claimed!</strong>
                             <p>You received ₹100 as welcome bonus</p>
                         `;
                     }
                     
-                    // Update timestamp
                     updateTimestamp();
                     
                 } else {
-                    console.error('Wallet API returned success: false');
                     window.location.href = '/';
                 }
             } catch (error) {
@@ -329,7 +306,10 @@
         
         async function logout() {
             try {
-                await fetch('/api/logout', { method: 'POST' });
+                await fetch('/api/logout', { 
+                    method: 'POST',
+                    credentials: 'include'
+                });
                 window.location.href = '/';
             } catch (error) {
                 console.error('Logout error:', error);
@@ -345,16 +325,16 @@
             try {
                 const response = await fetch('/api/reset-user', {
                     method: 'POST',
+                    credentials: 'include',
                     headers: {
                         'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ email: 'test@example.com' })
+                    }
                 });
                 
                 const data = await response.json();
                 
                 if (data.success) {
-                    alert('✓ Account reset successfully!\n\nYou can now login again to test the vulnerability.');
+                    alert('✔ Account reset successfully!\n\nYou can now login again to test the vulnerability.');
                     await logout();
                 } else {
                     alert('Failed to reset account. Please try again.');
@@ -365,14 +345,9 @@
             }
         }
         
-        // Load wallet info immediately on page load
-        console.log('Dashboard loaded. Fetching wallet info...');
         loadWalletInfo();
-        
-        // Auto-refresh every 2 seconds to catch real-time changes
         setInterval(() => loadWalletInfo(false), 2000);
         
-        // Add keyboard shortcut for refresh (F5 or Ctrl+R)
         document.addEventListener('keydown', (e) => {
             if (e.key === 'F5' || (e.ctrlKey && e.key === 'r')) {
                 e.preventDefault();

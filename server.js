@@ -16,7 +16,6 @@ app.use(cors({
     credentials: true
 }));
 
-
 app.use(session({
     name: 'justques-session',
     secret: process.env.SESSION_SECRET,
@@ -25,8 +24,8 @@ app.use(session({
     proxy: true,
     cookie: {
         maxAge: 3600000,
-        secure: true,
-        sameSite: 'none',
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
         httpOnly: true
     }
 }));
@@ -36,7 +35,7 @@ const pool = mysql.createPool({
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME,
-    port: process.env.DB_PORT || 4000, // TiDB uses port 4000
+    port: process.env.DB_PORT || 4000,
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
@@ -45,6 +44,63 @@ const pool = mysql.createPool({
         rejectUnauthorized: true
     }
 });
+
+/* =======================
+   SIGNUP (NEW)
+======================= */
+app.post('/api/signup', async (req, res) => {
+    const { username, email, password } = req.body;
+
+    try {
+        // Check if email already exists
+        const [existingUsers] = await pool.query(
+            'SELECT * FROM users WHERE email = ?',
+            [email]
+        );
+
+        if (existingUsers.length > 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Email already registered'
+            });
+        }
+
+        // Check if username already exists
+        const [existingUsername] = await pool.query(
+            'SELECT * FROM users WHERE username = ?',
+            [username]
+        );
+
+        if (existingUsername.length > 0) {
+            return res.status(400).json({
+                success: false,
+                message: 'Username already taken'
+            });
+        }
+
+        // Create new user
+        await pool.query(
+            'INSERT INTO users (username, email, password, wallet_balance, welcome_bonus_claimed) VALUES (?, ?, ?, 0, FALSE)',
+            [username, email, password]
+        );
+
+        res.json({
+            success: true,
+            message: 'Account created successfully! Please login.'
+        });
+
+    } catch (error) {
+        console.error('Signup error:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Server error'
+        });
+    }
+});
+
+/* =======================
+   LOGIN (RACE CONDITION)
+======================= */
 app.post('/api/login', async (req, res) => {
     const { email, password } = req.body;
 
@@ -73,8 +129,8 @@ app.post('/api/login', async (req, res) => {
         req.session.userId = user.id;
         req.session.username = user.username;
 
+        // ⚠️ INTENTIONALLY VULNERABLE RACE CONDITION
         if (!user.welcome_bonus_claimed) {
-
             await new Promise(resolve => setTimeout(resolve, 100));
 
             await pool.query(
@@ -123,6 +179,9 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
+/* =======================
+   WALLET
+======================= */
 app.get('/api/wallet', async (req, res) => {
     if (!req.session.userId) {
         return res.status(401).json({
@@ -165,24 +224,36 @@ app.get('/api/wallet', async (req, res) => {
     }
 });
 
+/* =======================
+   LOGOUT
+======================= */
 app.post('/api/logout', (req, res) => {
     req.session.destroy(() => {
         res.json({ success: true, message: 'Logged out successfully' });
     });
 });
 
+/* =======================
+   RESET USER (UPDATED)
+======================= */
 app.post('/api/reset-user', async (req, res) => {
-    const { email } = req.body;
+    if (!req.session.userId) {
+        return res.status(401).json({
+            success: false,
+            message: 'Not authenticated'
+        });
+    }
 
     try {
+        // Reset current logged-in user
         await pool.query(
-            'UPDATE users SET wallet_balance = 0, welcome_bonus_claimed = FALSE WHERE email = ?',
-            [email]
+            'UPDATE users SET wallet_balance = 0, welcome_bonus_claimed = FALSE WHERE id = ?',
+            [req.session.userId]
         );
 
         await pool.query(
-            'DELETE FROM bonus_transactions WHERE user_id IN (SELECT id FROM users WHERE email = ?)',
-            [email]
+            'DELETE FROM bonus_transactions WHERE user_id = ?',
+            [req.session.userId]
         );
 
         res.json({
@@ -199,6 +270,9 @@ app.post('/api/reset-user', async (req, res) => {
     }
 });
 
+/* =======================
+   STATIC PAGES
+======================= */
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
@@ -209,6 +283,7 @@ app.get('/dashboard', (req, res) => {
     }
     res.sendFile(path.join(__dirname, 'public', 'dashboard.html'));
 });
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
